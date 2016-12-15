@@ -1,6 +1,8 @@
 package com.example.fredrik.barometer;
 
 import android.app.Activity;
+import android.content.ContentValues;
+import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -9,11 +11,16 @@ import android.hardware.SensorManager;
 import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.PopupMenu;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.helper.DateAsXAxisLabelFormatter;
@@ -21,6 +28,7 @@ import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
 
 import java.text.DateFormat;
+import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -30,18 +38,14 @@ import java.util.Map;
 
 import static android.R.color.holo_green_dark;
 
-public class MainActivity extends Activity implements SensorEventListener{
+public class MainActivity extends AppCompatActivity  implements SensorEventListener{
 
-//    private final SensorManager mSensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
-//    private final Sensor mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE);
-
-//    private TextView tv;
     private Sensor mPressure;
     private SensorManager mSensorManager;
     private int previous=0;
     Integer counter=11;
     Map<String, Integer> pressures = new HashMap<String, Integer>();
-    MySqlHandler helper = new MySqlHandler(this); //Instantiera en databas
+    MySqlHandler mDbHelper = new MySqlHandler(this); //Instantiera en databas
 
     LineGraphSeries<DataPoint> grafData = new LineGraphSeries<>(new DataPoint[] {
             //new DataPoint(counter, bar),
@@ -71,10 +75,58 @@ public class MainActivity extends Activity implements SensorEventListener{
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-//        tv = (TextView) findViewById(R.id.textView);
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+
+    }
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // show menu when menu button is pressed
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.my_tab_menu, menu);
+
+        return true;
     }
 
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // display a message when a button was pressed
+        String message = "";
+        if (item.getItemId() == R.id.wtf) {
+            message = "A little bit more to the right!";
+        }
+        else if (item.getItemId() == R.id.cleardatabase) {
+            SQLiteDatabase db = mDbHelper.getWritableDatabase();
+            //mDbHelper.getLastIndex(db);
+            mDbHelper.onUpgrade(db,1,2);
+            message = "Database erased";
+        }
+        else if (item.getItemId() == R.id.cleargraph) {
+            clearGraphValues();
+            message = "Graph erased";
+        }
+        else if (item.getItemId() == R.id.about) {
+            message = "Fredrik Hansen made this";
+        }
+        else {
+            message = "Something went wrong here!?";
+        }
+        Toast toast = Toast.makeText(this, message, Toast.LENGTH_SHORT);
+        toast.show();
+        return true;
+    }
+
+    /**
+     * Tar bort värdena som visas på grafen.
+     * Databasen behåller sina värden
+     */
+    private void clearGraphValues(){
+        Log.d("ClearGraphValues", " GRAPH ");
+        pressures.clear();
+        GraphView graph = (GraphView) findViewById(R.id.graph);
+        graph.removeAllSeries();
+        grafData = new LineGraphSeries<>(new DataPoint[] {});
+        previous=0;
+    }
     public void onClick(View view) {
         mPressure = mSensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE);
 
@@ -98,7 +150,7 @@ public class MainActivity extends Activity implements SensorEventListener{
 
     protected void onResume() {
         super.onResume();
-        mSensorManager.registerListener(this, mPressure, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(this, mPressure, SensorManager.SENSOR_DELAY_UI);
     }
 
     protected void onPause() {
@@ -109,17 +161,29 @@ public class MainActivity extends Activity implements SensorEventListener{
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
     }
 
+    /**
+     * Metod att avrunda decimaltalet till närmsta heltal
+     * @param f
+     * @return
+     */
+    private int round(float f){
+        float absNumber = Math.abs(f);
+        int i = (int) absNumber;
+        float result = absNumber - (float) i;
+        if(result<0.5){
+            return f<0 ? -i : i;
+        }else{
+            return f<0 ? -(i+1) : i+1;
+        }
+    }
     public void onSensorChanged(SensorEvent event) {
 
         float pressure_value;
-        float height = 0.0f;
+//        float height = 0.0f;
         int bar=0;
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd HH:mm");
         String currentDateandTime = sdf.format(new Date());
-//        Date timestamp = new Date(currentDateandTime);
-//
-        Calendar calendar = Calendar.getInstance();
-        Date d1 = calendar.getTime();
+
 
         TextView tv = (TextView) findViewById(R.id.textView);
         TextView tv3 = (TextView) findViewById(R.id.textView3);
@@ -127,7 +191,7 @@ public class MainActivity extends Activity implements SensorEventListener{
         if (Sensor.TYPE_PRESSURE == event.sensor.getType()) {
 
             pressure_value = event.values[0];
-            bar = (int)pressure_value;
+            bar = round(pressure_value);
             if(bar!=previous){
                 previous=bar;
 
@@ -136,9 +200,9 @@ public class MainActivity extends Activity implements SensorEventListener{
                 graph.getViewport().setScrollableY(false); // enables vertical scrolling
                 graph.getViewport().setScalable(true); // enables horizontal zooming and scrolling
                 graph.getViewport().setScalableY(true); // enables vertical zooming and scrolling
+
                 graph.getViewport().setMaxX(20d);
                 graph.setTitle("mBar/hPa");
-
 
                 grafData.appendData(new DataPoint(counter, bar),true,counter);
                 graph.addSeries(grafData);
@@ -169,73 +233,29 @@ public class MainActivity extends Activity implements SensorEventListener{
                     iv.setBackgroundResource(R.drawable.sun1);
                 }
 
-
+                //Sätt det nya värdet i textview fönstret
                 tv.setText(" "+bar +" ");
                 pressures.put(currentDateandTime,bar);
+                //Spara resultaten till databasen
+                SQLiteDatabase db = mDbHelper.getWritableDatabase();
+                ContentValues values = new ContentValues();
+                values.put(MySqlHandler.ID, counter);
+                values.put(MySqlHandler.DATE, currentDateandTime);
+                values.put(MySqlHandler.MEASUREMENT, bar);
+                // Insert the new row, returning the primary key value of the new row
+                try {
+                    Log.d("Insert rows :", "" + db.insertWithOnConflict(MySqlHandler.TABLENAME, null, values, SQLiteDatabase.CONFLICT_REPLACE));
+                }catch(Exception e) {Log.e("SQL error: ", "insert fail! "+e);}
 
-                Log.d("Event :"," bar: "+pressures.values()+ " : " + pressure_value+ "    "+bar +"   "+pressures.size()+"  :  "+pressures.values().toString());
+
+                Log.d("Event match new value :"," bar: "+bar+ ", actual pressure: "+pressure_value+" DB: "+db.getPageSize());
                 counter++;
             }
             //height = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure_value);
-
-
-            Log.d("Event :", " bar: " + pressure_value+ "    "+bar+"\t"+ currentDateandTime);
-
+            Log.d("Event :", " bar: " + pressure_value+ "    "+bar+"\t"+ currentDateandTime+" ");
         }
 
     }
 }
 
-//    public Sensor getDefaultSensor(int type) {
-//        // TODO: need to be smarter, for now, just return the 1st sensor
-//        List<Sensor> l = getSensorList(type);
-//        boolean wakeUpSensor = false;
-//        // For the following sensor types, return a wake-up sensor. These types are by default
-//        // defined as wake-up sensors. For the rest of the SDK defined sensor types return a
-//        // non_wake-up version.
-//        if (type == Sensor.TYPE_PROXIMITY || type == Sensor.TYPE_SIGNIFICANT_MOTION ||
-//                type == Sensor.TYPE_TILT_DETECTOR || type == Sensor.TYPE_WAKE_GESTURE ||
-//                type == Sensor.TYPE_GLANCE_GESTURE || type == Sensor.TYPE_PICK_UP_GESTURE) {
-//            wakeUpSensor = true;
-//        }
-//
-//        for (Sensor sensor : l) {
-//            if (sensor.isWakeUpSensor() == wakeUpSensor) return sensor;
-//        }
-//        return null;
-//    }
 
-//    class SensorActivity extends Activity implements SensorEventListener {
-//        private final SensorManager mSensorManager;
-//        private final Sensor mPressure;
-//
-//        public SensorActivity() {
-//            mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-//            mPressure = mSensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE);
-//        }
-//
-//        protected void onResume() {
-//            super.onResume();
-//            mSensorManager.registerListener(this, mPressure, SensorManager.SENSOR_DELAY_NORMAL);
-//        }
-//
-//        protected void onPause() {
-//            super.onPause();
-//            mSensorManager.unregisterListener(this);
-//        }
-//
-//        public void onAccuracyChanged(Sensor sensor, int accuracy) {
-//        }
-//
-//        public void onSensorChanged(SensorEvent event) {
-//            float pressure_value;
-//            float height = 0.0f;
-//            TextView tv = (TextView) findViewById(R.id.textView);
-//            if (Sensor.TYPE_PRESSURE == event.sensor.getType()) {
-//                Log.d("Event :", " " + event + " " + event.values[0]);
-//                pressure_value = event.values[0];
-//                height = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure_value);
-//                tv.setText("" + height);
-//            }
-//        }
-//    }
