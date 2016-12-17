@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">Barometer</string>
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
+    <string name="Stormy">Lågtryck, Stormigt</string>
+    <string name="Rain">Lågtryck, Regn</string>
+    <string name="Change">Väderomslag</string>
+    <string name="Fair">Högtryck, Stabilt väder</string>
+    <string name="Draft">Högtryck, Torka</string>
 </resources>
