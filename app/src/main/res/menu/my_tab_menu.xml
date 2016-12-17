@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/wtf"
+        android:title=" "
+        app:showAsAction="ifRoom"/>
+    <item
+        android:id="@+id/cleardatabase"
+        android:title="Clear database"/>
+    <item
+        android:id="@+id/history"
+        android:title="Show history"/>
+    <item
+        android:id="@+id/cleargraph"
+        android:title="Clear graph"/>
+    <item
+        android:id="@+id/about"
+        android:title="About"/>
+    <item
+        android:id="@+id/exit"
+        android:title="EXIT"/>
+</menu>
